@@ -1,9 +1,9 @@
 # openai_analysis.py
 import os
 from typing import Dict, Any
-from openai import OpenAI
+from openai import OpenAI, AzureOpenAI
 
-from config import OPENAI_API_KEY
+from config import OPENAI_API_KEY, AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION, AZURE_OPENAI_DEPLOYMENT
 
 PROMPT_TEMPLATES = {
     "executive_summary": (
@@ -69,10 +69,22 @@ def openai_completion(filing_data: Dict[str, Any],
     {data}
     """
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    completion = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "system", "content": system_prompt}]
-    )
+    if len(OPENAI_API_KEY):
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "system", "content": system_prompt}]
+        )
+    else:
+        # AZURE
+        client = AzureOpenAI(
+            api_key=AZURE_OPENAI_API_KEY,
+            api_version=AZURE_OPENAI_API_VERSION,
+            azure_endpoint=AZURE_OPENAI_ENDPOINT
+        )
+        completion = client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT,
+            messages=[{"role": "system", "content": system_prompt}]
+        )
 
     return completion.choices[0].message.content

@@ -9,3 +9,7 @@ if os.path.exists(dotenv_path):
 
 EDINET_API_KEY = os.environ.get('EDINET_API_KEY')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+AZURE_OPENAI_API_KEY = os.environ.get('AZURE_OPENAI_API_KEY')
+AZURE_OPENAI_ENDPOINT = os.environ.get('AZURE_OPENAI_ENDPOINT')
+AZURE_OPENAI_API_VERSION = os.environ.get('AZURE_OPENAI_API_VERSION')
+AZURE_OPENAI_DEPLOYMENT = os.environ.get('AZURE_OPENAI_DEPLOYMENT')
