@@ -1,88 +1,214 @@
 # demo.py
 import os
 import time
-from datetime import datetime, timedelta
-from colorama import init, Fore, Style
+import datetime
+import logging
+
+from logging_config import setup_logging
+setup_logging()
 
 from edinet_tools import get_documents_for_date_range, download_documents
 from utils import process_zip_directory
-from analysis_tools import openai_completion
+from llm_analysis_tools import analyze_document_data, TOOL_MAP
+from config import SUPPORTED_DOC_TYPES
 
-# Initialize colorama for cross-platform color support
-init()
+logger = logging.getLogger(__name__)
 
 
 def print_header():
-    print(f"{Fore.BLUE}{'=' * 80}{Style.RESET_ALL}")
-    print(f"{Fore.BLUE}{'EDINET API x OpenAI Analysis':^80}{Style.RESET_ALL}")
-    print(f"{Fore.BLUE}{'=' * 80}{Style.RESET_ALL}")
+    """Prints a stylized header using logging."""
+    logger.info("=" * 80)
+    logger.info("EDINET API x Structured LLM Analysis Demo")
+    logger.info("=" * 80)
 
 
 def print_progress(message):
-    print(f"{Fore.CYAN}{message}{Style.RESET_ALL}")
+    """Logs a progress message."""
+    logger.info(message)
 
 
-def get_most_recent_documents(doc_type_codes):
-    current_date = datetime.now().date()
-    max_attempts = 7  # up to a week back
+def get_most_recent_documents(doc_type_codes, days_back=7):
+    """
+    Fetch documents from the most recent day with filings within a date range.
+    Searches back day by day up to `days_back`.
+    """
+    current_date = datetime.date.today()
+    end_date = current_date # Search up to today
+    start_date = current_date - datetime.timedelta(days=days_back) # Search back up to days_back
 
-    for _ in range(max_attempts):
-        print(f"{Fore.CYAN}Fetching documents for {current_date}...{Style.RESET_ALL}")
-        docs = get_documents_for_date_range(current_date, current_date, doc_type_codes=doc_type_codes)
+    logger.info(f"Searching for documents in the last {days_back} days ({start_date} to {end_date})...")
 
-        if docs:
-            print(f"{Fore.GREEN}Found {len(docs)} documents for {current_date}.{Style.RESET_ALL}")
-            return docs, current_date
+    # Iterate backwards day by day from end_date to start_date
+    date_to_check = end_date
+    while date_to_check >= start_date:
+        logger.info(f"Fetching documents for {date_to_check}...")
+        try:
+            # Get documents for a single date
+            docs = get_documents_for_date_range(date_to_check, date_to_check, doc_type_codes=doc_type_codes)
 
-        print(f"{Fore.YELLOW}No documents found for {current_date}. Trying previous day.{Style.RESET_ALL}")
-        current_date -= timedelta(days=1)
+            if docs:
+                logger.info(f"Found {len(docs)} documents for {date_to_check}. Processing these.")
+                return docs, date_to_check # Return documents for the first day with results found
 
-    print(f"{Fore.RED}No documents found in the last {max_attempts} days.{Style.RESET_ALL}")
+            logger.info(f"No documents found for {date_to_check}. Trying previous day.")
+            date_to_check -= datetime.timedelta(days=1)
+
+        except Exception as e:
+            logger.error(f"Error fetching documents for {date_to_check}: {e}")
+            # Continue to previous day even if one date fails
+
+    logger.warning(f"No documents found in the last {days_back} days matching criteria.")
     return [], None
 
 
 def run_demo():
+    """Runs the main demo workflow."""
     print_header()
 
-    print(
-        f"\n{Fore.CYAN}Initializing EDINET API connection..."
-        f"{Style.RESET_ALL}"
-    )
-    time.sleep(1)
+    logger.info("Initializing...")
 
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=2)
-    doc_type_codes = ["180"]  # Extraordinary Reports
 
-    docs, found_date = get_most_recent_documents(doc_type_codes)
+    # Define document types to look for
+    # Only fetch document types for which we have specific processors to ensure
+    # process_zip_directory can create meaningful structured data.
+    # If you want to fetch other types, ensure GenericReportProcessor is sufficient,
+    # or add specific processors in document_processors.py
+    doc_type_codes_to_fetch = ["160", "180"] # Semi-Annual and Extraordinary Reports
 
-    if not docs:
-        print(f"{Fore.RED}No documents found. Exiting demo.{Style.RESET_ALL}")
+
+    days_back = 3
+
+    # Fetch the most recent documents of the specified types
+    docs_metadata, found_date = get_most_recent_documents(doc_type_codes_to_fetch,
+                                                          days_back=days_back)
+
+    if not docs_metadata:
+        logger.error(f"No documents found meeting criteria in the last {days_back} days. Exiting demo.")
         return
 
     download_dir = os.path.join(".", "downloads")
-    download_documents(docs, download_dir)
 
-    print(f"\n{Fore.CYAN}Analyzing first ten disclosures...{Style.RESET_ALL}")
-    all_results = process_zip_directory(download_dir, doc_type_codes=doc_type_codes)
+    # download_documents function handles creating the directory
+    download_documents(docs_metadata, download_dir)
 
-    print(f"\n{Fore.BLUE}{'=' * 80}{Style.RESET_ALL}")
-    print(f"{Fore.BLUE}{'EDINET Financial Disclosure Analysis':^80}{Style.RESET_ALL}")
-    print(f"{Fore.BLUE}{'=' * 80}{Style.RESET_ALL}\n")
+    logger.info(f"\nProcessing downloaded documents from {found_date}...")
 
-    for i, disclosure_data in enumerate(all_results[:10], 1):
-        company_name = disclosure_data.get("company_name_en", "Unknown Company")
-        print(f"{Fore.MAGENTA}{i:02d}/{min(10, len(all_results)):02d} - {company_name}{Style.RESET_ALL}")
-        print_progress("Analyzing disclosure data...")
-        one_liner = openai_completion(disclosure_data)
-        m_a_signal = openai_completion(disclosure_data, prompt_type='m_a_signal')
+    # Process the downloaded zip files into structured data
+    # We pass the keys of SUPPORTED_DOC_TYPES because process_zip_directory
+    # uses process_raw_csv_data which dispatches based on these codes.
+    structured_document_data_list = process_zip_directory(download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys()))
 
-        print(f"{Fore.WHITE}{one_liner}{Style.RESET_ALL}\n")
-        print(f"{Fore.RED}{m_a_signal}{Style.RESET_ALL}\n")
-        print(f"{Fore.BLUE}{'-' * 80}{Style.RESET_ALL}\n")
-        time.sleep(2)  # pause between entries for readability
 
-    print(f"\n{Fore.GREEN}Analysis complete. {len(all_results)} documents processed for {found_date}.{Style.RESET_ALL}")
+    # Filter out metadata for documents that failed processing
+    processed_doc_ids = {data.get('doc_id') for data in structured_document_data_list if data.get('doc_id')}
+    docs_metadata_for_processed = [doc for doc in docs_metadata if doc.get('docID') in processed_doc_ids]
+
+
+    if not docs_metadata_for_processed:
+         logger.error("No documents were successfully processed into structured data. Exiting demo.")
+         return
+
+    # Create a map from doc_id to structured data for quick lookup
+    structured_data_map = {data['doc_id']: data for data in structured_document_data_list if 'doc_id' in data}
+
+
+    # LLM analysis section
+    logger.info(f"\n{'*' * 80}")
+    logger.info("Starting LLM Analysis...")
+    logger.info(f"{'*' * 80}")
+
+    # List to collect analysis results for later printing
+    all_analysis_results = []
+
+    # Analyze the first few *successfully processed* documents using LLM tools
+    # Limit analysis to the first 5 processed documents found
+    num_to_analyze = min(5, len(docs_metadata_for_processed))
+    docs_to_analyze_metadata = docs_metadata_for_processed[:num_to_analyze]
+
+    logger.info(f"Analyzing the first {len(docs_to_analyze_metadata)} processed disclosures:")
+
+    # Define the order of analysis types for consistent output
+    analysis_types_to_run = ['one_line_summary', 'executive_summary',]
+
+
+    for i, doc_meta in enumerate(docs_to_analyze_metadata, 1):
+        doc_id = doc_meta.get('docID')
+        structured_data = structured_data_map.get(doc_id)
+        doc_type_code = doc_meta.get('docTypeCode')
+        company_name_en = structured_data.get('company_name_en', doc_meta.get('filerName', 'Unknown Company'))
+        doc_type_name = SUPPORTED_DOC_TYPES.get(doc_type_code, doc_type_code)
+        submit_date_time_str = doc_meta.get('submitDateTime', 'Date N/A')
+
+
+        logger.info(f"\n[{i}/{num_to_analyze}] Analyzing {company_name_en} ({doc_type_name}, ID: {doc_id})...")
+
+        current_doc_analyses = {
+            'doc_id': doc_id,
+            'company_name_en': company_name_en,
+            'doc_type': doc_type_name,
+            'submit_date_time': submit_date_time_str,
+            'analyses': {} # Store results for this doc here
+        }
+
+        for analysis_type in analysis_types_to_run:
+             if analysis_type not in TOOL_MAP:
+                  logger.warning(f"Skipping unknown analysis type: {analysis_type}")
+                  continue
+
+             print_progress(f"  Generating '{analysis_type}' analysis...")
+             try:
+                 # Call the analysis function and store the result
+                 analysis_output = analyze_document_data(structured_data, analysis_type)
+                 current_doc_analyses['analyses'][analysis_type] = analysis_output # Store output text or None
+             except Exception as e:
+                 logger.error(f"  Error during '{analysis_type}' analysis: {e}")
+                 # Store an error message if analysis fails
+                 current_doc_analyses['analyses'][analysis_type] = f"Error generating analysis: {e}"
+
+        all_analysis_results.append(current_doc_analyses) # Add doc's results to the list
+        logger.info(f"Finished analyses for document {i}/{num_to_analyze}.")
+
+
+    print(f"\n\n{'=' * 80}")
+    print("FINAL LLM ANALYSIS RESULTS")
+    print(f"{'=' * 80}\n")
+
+    if not all_analysis_results:
+        print("No analysis results were collected.")
+    else:
+        for i, doc_results in enumerate(all_analysis_results, 1):
+            print(f"{'-' * 80}")
+
+            # per-document header lines - should all be strings
+            doc_num_str = f"{i}/{len(all_analysis_results)}"
+            company_name_str = doc_results.get('company_name_en', 'Unknown Company')
+            doc_type_str = doc_results.get('doc_type', 'Unknown Type')
+            doc_id_str = doc_results.get('doc_id', 'N/A')
+            date_str = doc_results.get('submit_date_time', 'Date N/A')
+
+            print(f"*** Document {doc_num_str} - {company_name_str} - {doc_type_str}: {doc_id_str} ***")
+            print(f"Submitted at: {date_str}")
+
+            if not doc_results.get('analyses'):
+                print("\n  No analyses were generated for this document.")
+            else:
+                for analysis_type in analysis_types_to_run:
+                    output_text = doc_results['analyses'].get(analysis_type)
+
+                    print(f"\n**{analysis_type.replace('_', ' ').title()}**")
+                    if output_text is not None and not isinstance(output_text, str) or (isinstance(output_text, str) and not output_text.startswith("Error generating analysis:")):
+                         # means valid output text
+                         print(output_text)
+                    elif output_text: # means output_text is an error string
+                         print(f"  {output_text}")
+                    else: # means output_text was None
+                        print("  Analysis failed or returned empty.")
+
+
+    print(f"\n{'=' * 80}")
+
+
+    logger.info(f"\nDemo run complete. Analysis results printed above.")
 
 if __name__ == "__main__":
     run_demo()
