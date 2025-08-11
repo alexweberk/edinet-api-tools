@@ -1,0 +1,1 @@
+Carefully review the codebase and identify the top 5 areas of improvement for long-term maintainability, readability and consistency, modularity, and extensibility. List them out first. Do not implement yet.

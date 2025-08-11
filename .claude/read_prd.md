@@ -1,0 +1,1 @@
+Carefully read @docs/PRD.md and @docs/ACTION_PLAN.md It is highly important that you fully understand the product details and the value we are creating for the customer. Once you are done reading, let me know and I will give you the next instructions.
