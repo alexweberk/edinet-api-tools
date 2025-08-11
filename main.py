@@ -1,4 +1,7 @@
+import argparse
+import json
 import logging
+import sys
 
 from src.config import ANALYSIS_LIMIT, DAYS_BACK
 from src.constants import DEFAULT_DOWNLOAD_DIR, SUPPORTED_DOC_TYPES
@@ -8,12 +11,81 @@ from src.logging_config import setup_logging
 from src.services import (
     analyze_document_data,
     get_most_recent_documents,
+    get_structured_data_for_company_date_range,
     get_structured_data_from_zip_directory,
 )
 from src.utils import print_header, print_progress
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="EDINET API Tools - Fetch and analyze Japanese financial disclosure documents"
+    )
+
+    # Company date range query flags
+    parser.add_argument(
+        "--edinet-code",
+        type=str,
+        help="EDINET code for the company to fetch documents for",
+    )
+    parser.add_argument(
+        "--start-date",
+        type=str,
+        help="Start date for the date range (YYYY-MM-DD format)",
+    )
+    parser.add_argument(
+        "--end-date", type=str, help="End date for the date range (YYYY-MM-DD format)"
+    )
+    parser.add_argument(
+        "--doc-types",
+        type=str,
+        help="Comma-separated list of document type codes to include (e.g., 160,180)",
+    )
+    parser.add_argument(
+        "--output", type=str, help="Optional output file path to write JSON results"
+    )
+
+    return parser.parse_args()
+
+
+def run_company_date_range_query(args):
+    """Run the company date range query based on CLI arguments."""
+    # Parse doc types if provided
+    doc_type_codes = None
+    if args.doc_types:
+        doc_type_codes = [code.strip() for code in args.doc_types.split(",")]
+        logger.info(f"Filtering for document types: {doc_type_codes}")
+
+    try:
+        # Call the new function
+        structured_data = get_structured_data_for_company_date_range(
+            edinet_code=args.edinet_code,
+            start_date=args.start_date,
+            end_date=args.end_date,
+            doc_type_codes=doc_type_codes,
+        )
+
+        # Convert to JSON
+        json_output = json.dumps(structured_data, indent=2, ensure_ascii=False)
+
+        # Print to stdout
+        print(json_output)
+
+        # Also write to file if output path is provided
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(json_output)
+            logger.info(f"JSON output also written to: {args.output}")
+
+        logger.info(f"Successfully processed {len(structured_data)} documents")
+
+    except Exception as e:
+        logger.error(f"Error during company date range query: {e}")
+        sys.exit(1)
 
 
 def run_demo() -> None:
@@ -215,4 +287,21 @@ def run_demo() -> None:
 
 
 if __name__ == "__main__":
-    run_demo()
+    args = parse_args()
+
+    # Check if any company date range query flags are provided
+    company_query_flags = [args.edinet_code, args.start_date, args.end_date]
+    if any(company_query_flags):
+        # Validate that all required flags are provided
+        if not all([args.edinet_code, args.start_date, args.end_date]):
+            logger.error(
+                "When using company date range query mode, --edinet-code, --start-date, and --end-date are all required"
+            )
+            sys.exit(1)
+
+        logger.info("Running company date range query mode...")
+        run_company_date_range_query(args)
+    else:
+        # No flags provided, run the existing demo
+        logger.info("No CLI flags provided, running demo mode...")
+        run_demo()
