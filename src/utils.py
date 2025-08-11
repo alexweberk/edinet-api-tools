@@ -13,20 +13,20 @@ from src.document_processors import process_raw_csv_data
 logger = logging.getLogger(__name__)
 
 
-def print_header():
+def print_header() -> None:
     """Prints a stylized header using logging."""
     logger.info("=" * 80)
     logger.info("EDINET API x Structured LLM Analysis Demo")
     logger.info("=" * 80)
 
 
-def print_progress(message):
+def print_progress(message: str) -> None:
     """Logs a progress message."""
     logger.info(message)
 
 
 # Encoding and file reading
-def detect_encoding(file_path):
+def detect_encoding(file_path: str) -> str | None:
     """Detect encoding of a file."""
     try:
         with open(file_path, "rb") as file:
@@ -36,12 +36,12 @@ def detect_encoding(file_path):
             f"Detected encoding {result['encoding']} with confidence {result['confidence']} for {os.path.basename(file_path)}"
         )
         return result["encoding"]
-    except IOError as e:
+    except OSError as e:
         logger.error(f"Error detecting encoding for {file_path}: {e}")
         return None
 
 
-def read_csv_file(file_path):
+def read_csv_file(file_path: str) -> list[dict[str, str | None]] | None:
     """Read a tab-separated CSV file trying multiple encodings."""
     detected_encoding = detect_encoding(file_path)
 
@@ -74,7 +74,7 @@ def read_csv_file(file_path):
             )
             # Replace NaN with None to handle missing values consistently
             df = df.replace({float("nan"): None, "": None})
-            return df.to_dict(orient="records")  # Return as list of dictionaries
+            return df.to_dict(orient="records")  # type: ignore[return-value]
         except (
             UnicodeDecodeError,
             pd.errors.EmptyDataError,

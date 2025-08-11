@@ -1,7 +1,7 @@
 # document_processors.py
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class BaseDocumentProcessor:
 
     def __init__(
         self, raw_csv_data: list[dict[str, Any]], doc_id: str, doc_type_code: str
-    ):
+    ) -> None:
         """
         Initialize with raw data from CSV files and document metadata.
 
@@ -55,8 +55,8 @@ class BaseDocumentProcessor:
         return combined
 
     def get_value_by_id(
-        self, element_id: str, context_filter: Optional[str] = None
-    ) -> Optional[str]:
+        self, element_id: str, context_filter: str | None = None
+    ) -> str | None:
         """Helper to find a value for a specific element ID, optionally filtered by context."""
         for record in self.all_records:
             if record.get("要素ID") == element_id:
@@ -68,13 +68,13 @@ class BaseDocumentProcessor:
                     return clean_text(value)
         return None
 
-    def get_records_by_id(self, element_id: str) -> List[Dict[str, Any]]:
+    def get_records_by_id(self, element_id: str) -> list[dict[str, Any]]:
         """Helper to find all records for a specific element ID."""
         return [
             record for record in self.all_records if record.get("要素ID") == element_id
         ]
 
-    def get_all_text_blocks(self) -> List[Dict[str, str]]:
+    def get_all_text_blocks(self) -> list[dict[str, str]]:
         """Extract all generic TextBlock elements."""
         text_blocks = []
         for record in self.all_records:
@@ -108,7 +108,7 @@ class BaseDocumentProcessor:
 
         return text_blocks
 
-    def process(self) -> Optional[StructuredDocumentData]:
+    def process(self) -> StructuredDocumentData | None:
         """
         Process the raw CSV data into a structured dictionary.
         Must be implemented by subclasses.
@@ -141,7 +141,7 @@ class BaseDocumentProcessor:
 class ExtraordinaryReportProcessor(BaseDocumentProcessor):
     """Processor for Extraordinary Reports (doc_type_code '180')."""
 
-    def process(self) -> Optional[StructuredDocumentData]:
+    def process(self) -> StructuredDocumentData | None:
         """Extract key data points and text blocks for Extraordinary Reports."""
         logger.debug(f"Processing Extraordinary Report (doc_id: {self.doc_id})")
         structured_data = self._get_common_metadata()
@@ -188,7 +188,7 @@ class ExtraordinaryReportProcessor(BaseDocumentProcessor):
 class SemiAnnualReportProcessor(BaseDocumentProcessor):
     """Processor for Semi-Annual Reports (doc_type_code '160')."""
 
-    def process(self) -> Optional[StructuredDocumentData]:
+    def process(self) -> StructuredDocumentData | None:
         """Extract key data points, tables, and text blocks for Semi-Annual Reports."""
         logger.debug(f"Processing Semi-Annual Report (doc_id: {self.doc_id})")
         structured_data = self._get_common_metadata()
@@ -279,7 +279,7 @@ class SemiAnnualReportProcessor(BaseDocumentProcessor):
 class GenericReportProcessor(BaseDocumentProcessor):
     """Processor for other document types (default)."""
 
-    def process(self) -> Optional[StructuredDocumentData]:
+    def process(self) -> StructuredDocumentData | None:
         """Extract common metadata and all text blocks for generic reports."""
         logger.debug(
             f"Processing Generic Report (doc_id: {self.doc_id}, type: {self.doc_type_code})"

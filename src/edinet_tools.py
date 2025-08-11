@@ -3,7 +3,7 @@ import datetime
 import logging
 import os
 import time
-from typing import Dict, List, Union
+from typing import Any
 
 import httpx
 
@@ -16,19 +16,19 @@ logger = logging.getLogger(__name__)
 
 # API interaction functions
 def fetch_documents_list(
-    date: Union[str, datetime.date],
+    date: str | datetime.date,
     type: int = 2,
     max_retries: int = 3,
     delay_seconds: int = 5,
-) -> Dict:
+) -> dict[str, Any]:
     """
     Retrieve disclosure documents from EDINET API for a specified date with retries.
     """
     if isinstance(date, str):
         try:
             datetime.datetime.strptime(date, "%Y-%m-%d")
-        except ValueError:
-            raise ValueError("Invalid date string. Use format 'YYYY-MM-DD'")
+        except ValueError as e:
+            raise ValueError("Invalid date string. Use format 'YYYY-MM-DD'") from e
         date_str = date
     elif isinstance(date, datetime.date):
         date_str = date.strftime("%Y-%m-%d")
@@ -161,12 +161,14 @@ def save_document_content(doc_content: bytes, output_path: str) -> None:
         with open(output_path, "wb") as file_out:
             file_out.write(doc_content)
         logger.info(f"Saved document content to {output_path}")
-    except IOError as e:
+    except OSError as e:
         logger.error(f"Error saving document content to {output_path}: {e}")
         raise  # Re-raise to indicate failure
 
 
-def download_documents(docs: List[Dict], download_dir: str = "./downloads") -> None:
+def download_documents(
+    docs: list[dict[str, Any]], download_dir: str = "./downloads"
+) -> None:
     """
     Download all documents in the provided list.
     """
@@ -208,18 +210,24 @@ def download_documents(docs: List[Dict], download_dir: str = "./downloads") -> N
 
 # Document filtering and processing
 def filter_documents(
-    docs: List[Dict],
-    edinet_codes: Union[List[str], str] = [],
-    doc_type_codes: Union[List[str], str] = [],
-    excluded_doc_type_codes: Union[List[str], str] = [],
+    docs: list[dict[str, Any]],
+    edinet_codes: list[str] | str | None = None,
+    doc_type_codes: list[str] | str | None = None,
+    excluded_doc_type_codes: list[str] | str | None = None,
     require_sec_code: bool = True,
-) -> List[Dict]:
+) -> list[dict[str, Any]]:
     """Filter list of documents by EDINET codes and document type codes."""
-    if isinstance(edinet_codes, str):
+    if edinet_codes is None:
+        edinet_codes = []
+    elif isinstance(edinet_codes, str):
         edinet_codes = [edinet_codes]
-    if isinstance(doc_type_codes, str):
+    if doc_type_codes is None:
+        doc_type_codes = []
+    elif isinstance(doc_type_codes, str):
         doc_type_codes = [doc_type_codes]
-    if isinstance(excluded_doc_type_codes, str):
+    if excluded_doc_type_codes is None:
+        excluded_doc_type_codes = []
+    elif isinstance(excluded_doc_type_codes, str):
         excluded_doc_type_codes = [excluded_doc_type_codes]
 
     filtered_list = []
@@ -261,12 +269,18 @@ def filter_documents(
 def get_documents_for_date_range(
     start_date: datetime.date,
     end_date: datetime.date,
-    edinet_codes: List[str] = [],
-    doc_type_codes: List[str] = [],
-    excluded_doc_type_codes: List[str] = [],
+    edinet_codes: list[str] | None = None,
+    doc_type_codes: list[str] | None = None,
+    excluded_doc_type_codes: list[str] | None = None,
     require_sec_code: bool = True,
-) -> List[Dict]:
+) -> list[dict[str, Any]]:
     """Retrieve and filter documents for a date range."""
+    if edinet_codes is None:
+        edinet_codes = []
+    if doc_type_codes is None:
+        doc_type_codes = []
+    if excluded_doc_type_codes is None:
+        excluded_doc_type_codes = []
     matching_docs = []
     current_date = start_date
     while current_date <= end_date:

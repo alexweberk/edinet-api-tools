@@ -16,9 +16,17 @@ python demo.py
 pip install -r requirements.txt
 ```
 
-**Linting (flake8 is available):**
+**Linting and code formatting:**
 ```bash
-flake8 .
+uv run ruff check .      # Check linting
+uv run ruff format .     # Format code
+uv run ruff check . --fix # Auto-fix issues
+```
+
+**Pre-commit hooks:**
+```bash
+uv run pre-commit install        # Install git hooks
+uv run pre-commit run --all-files # Run on all files
 ```
 
 **Installing LLM plugins for different models:**
@@ -77,7 +85,7 @@ Uses the `llm` library for model-agnostic LLM access:
 
 Defined in `config.py`:
 - 160: Semi-Annual Report
-- 140: Quarterly Report  
+- 140: Quarterly Report
 - 180: Extraordinary Report
 - 350: Large Holding Report
 - 030: Securities Registration Statement

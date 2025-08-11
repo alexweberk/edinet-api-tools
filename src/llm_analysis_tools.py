@@ -1,7 +1,6 @@
 # llm_analysis_tools.py
 import json
 import logging
-from typing import Any, Dict, List, Optional, Type
 
 import llm
 from pydantic import BaseModel, Field
@@ -28,18 +27,18 @@ class ExecutiveSummary(BaseModel):
     """Insightful, concise executive summary and key highlights."""
 
     company_name_en: str = Field(..., description="Company name in English (all caps).")
-    company_description_short: Optional[str] = Field(
+    company_description_short: str | None = Field(
         None, description="Very concise (<15 words) summary of what the company does."
     )
     summary: str = Field(
         ...,
         description="Insightful and concise executive summary interpreting the data with a strategic lens.",
     )
-    key_highlights: List[str] = Field(
+    key_highlights: list[str] = Field(
         ...,
         description="Key takeaways or important points from the disclosure as bullet points.",
     )
-    potential_impact_rationale: Optional[str] = Field(
+    potential_impact_rationale: str | None = Field(
         None,
         description="Very concise (<25 words) summary of the potential impact, with rationale.",
     )
@@ -49,10 +48,13 @@ class ExecutiveSummary(BaseModel):
 class BasePromptTool:
     """Base class for all prompt-based tools that use schemas."""
 
-    schema_class: Type[BaseModel]  # Must be defined by subclasses
+    schema_class: type[BaseModel]  # Must be defined by subclasses
     tool_name: str = "BaseTool"
 
-    def get_model(self) -> llm.Model:
+    def __init__(self) -> None:
+        pass
+
+    def get_model(self) -> "llm.Model":
         """Get the appropriate LLM model based on configuration."""
         if not LLM_API_KEY:
             logger.error("LLM_API_KEY is not set. Cannot get LLM model.")
@@ -81,7 +83,9 @@ class BasePromptTool:
                 logger.error(
                     f"Failed to get fallback LLM model '{LLM_FALLBACK_MODEL}': {fallback_e}. LLM analysis disabled."
                 )
-                raise ConnectionError(f"Failed to get any LLM model: {e}, {fallback_e}")
+                raise ConnectionError(
+                    f"Failed to get any LLM model: {e}, {fallback_e}"
+                ) from e
 
     def create_prompt(self, structured_data: StructuredDocumentData) -> str:
         """
@@ -90,7 +94,7 @@ class BasePromptTool:
         """
         raise NotImplementedError("Subclasses must implement create_prompt")
 
-    def format_to_text(self, schema_object: Any) -> str:
+    def format_to_text(self, schema_object: BaseModel) -> str:
         """
         Format the schema object output into a human-readable string.
         Subclasses must implement this.
@@ -99,7 +103,7 @@ class BasePromptTool:
 
     def generate_structured_output(
         self, structured_data: StructuredDocumentData
-    ) -> Optional[BaseModel]:
+    ) -> BaseModel | None:
         """Generate structured output from document data using the schema."""
         try:
             model = self.get_model()
@@ -177,7 +181,7 @@ class BasePromptTool:
 
     def generate_formatted_text(
         self, structured_data: StructuredDocumentData
-    ) -> Optional[str]:
+    ) -> str | None:
         """Generate structured output and format it to plain text."""
         structured_output = self.generate_structured_output(structured_data)
         if structured_output:
@@ -193,8 +197,8 @@ class BasePromptTool:
 
 
 class OneLinerTool(BasePromptTool):
-    schema_class = OneLineSummary
-    tool_name = "one_line_summary"
+    schema_class: type[BaseModel] = OneLineSummary
+    tool_name: str = "one_line_summary"
 
     def create_prompt(self, structured_data: StructuredDocumentData) -> str:
         """Prompt for a one-line summary."""
@@ -245,8 +249,8 @@ class OneLinerTool(BasePromptTool):
 
 
 class ExecutiveSummaryTool(BasePromptTool):
-    schema_class = ExecutiveSummary
-    tool_name = "executive_summary"
+    schema_class: type[BaseModel] = ExecutiveSummary
+    tool_name: str = "executive_summary"
 
     def create_prompt(self, structured_data: StructuredDocumentData) -> str:
         """Prompt for an executive summary."""
@@ -323,7 +327,7 @@ class ExecutiveSummaryTool(BasePromptTool):
 
 
 # Tool Map and Analysis Function
-TOOL_MAP: Dict[str, Type[BasePromptTool]] = {
+TOOL_MAP: dict[str, type[BasePromptTool]] = {
     OneLinerTool.tool_name: OneLinerTool,
     ExecutiveSummaryTool.tool_name: ExecutiveSummaryTool,
     # Add other tools here
@@ -332,7 +336,7 @@ TOOL_MAP: Dict[str, Type[BasePromptTool]] = {
 
 def analyze_document_data(
     structured_data: StructuredDocumentData, tool_name: str
-) -> Optional[str]:
+) -> str | None:
     """
     Analyze structured document data using the specified LLM tool.
 

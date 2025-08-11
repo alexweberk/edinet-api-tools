@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+from typing import Any
 
 from src.consts import SUPPORTED_DOC_TYPES
 from src.edinet_tools import download_documents, get_documents_for_date_range
@@ -12,7 +13,9 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def get_most_recent_documents(doc_type_codes, days_back=7):
+def get_most_recent_documents(
+    doc_type_codes: list[str], days_back: int = 7
+) -> tuple[list[dict[str, Any]], datetime.date | None]:
     """
     Fetch documents from the most recent day with filings within a date range.
     Searches back day by day up to `days_back`.
@@ -59,7 +62,7 @@ def get_most_recent_documents(doc_type_codes, days_back=7):
     return [], None
 
 
-def run_demo():
+def run_demo() -> None:
     """Runs the main demo workflow."""
     print_header()
 
@@ -149,10 +152,17 @@ def run_demo():
         doc_id = doc_meta.get("docID")
         structured_data = structured_data_map.get(doc_id)
         doc_type_code = doc_meta.get("docTypeCode")
-        company_name_en = structured_data.get(
-            "company_name_en", doc_meta.get("filerName", "Unknown Company")
+        company_name_en = (
+            structured_data.get(
+                "company_name_en", doc_meta.get("filerName", "Unknown Company")
+            )
+            if structured_data
+            else doc_meta.get("filerName", "Unknown Company")
         )
-        doc_type_name = SUPPORTED_DOC_TYPES.get(doc_type_code, doc_type_code)
+        doc_type_name = SUPPORTED_DOC_TYPES.get(
+            str(doc_type_code) if doc_type_code else "",
+            str(doc_type_code) if doc_type_code else "Unknown",
+        )
         submit_date_time_str = doc_meta.get("submitDateTime", "Date N/A")
 
         logger.info(
@@ -175,6 +185,11 @@ def run_demo():
             print_progress(f"  Generating '{analysis_type}' analysis...")
             try:
                 # Call the analysis function and store the result
+                if structured_data is None:
+                    logger.warning(
+                        f"No structured data available for doc_id {doc_id}, skipping analysis"
+                    )
+                    continue
                 analysis_output = analyze_document_data(structured_data, analysis_type)
                 current_doc_analyses["analyses"][analysis_type] = (
                     analysis_output  # Store output text or None
