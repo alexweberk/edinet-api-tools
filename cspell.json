@@ -1,0 +1,20 @@
+{
+  "version": "0.2",
+  "ignorePaths": ["pyproject.toml"],
+  "dictionaryDefinitions": [],
+  "dictionaries": [],
+  "words": [
+    "dotenv",
+    "EDINET",
+    "IFRS",
+    "jpaud",
+    "jpcrp",
+    "jpdei",
+    "jpigp",
+    "jppfs",
+    "retryable",
+    "xbrl"
+  ],
+  "ignoreWords": [],
+  "import": []
+}

@@ -55,6 +55,11 @@ Leverage the power of Large Language Models to extract specific, structured insi
 
 5.  Set up environment variables:
     -   Create a `.env` file in the project root.
+
+        ```bash
+        cp .env.example .env
+        ```
+
     -   Add your API keys and specify your desired LLM:
         ```dotenv
         EDINET_API_KEY=<your_edinet_api_key>
@@ -109,6 +114,13 @@ This will:
 -   **Analysis Tools:** Modify `llm_analysis_tools.py` to create new analysis tools. Define a Pydantic schema for the desired output, create a class inheriting from `BasePromptTool`, implement `create_prompt` and `format_to_text`, and add your new tool to the `TOOL_MAP`.
 -   **Document Processing:** Add new classes inheriting from `BaseDocumentProcessor` in `document_processors.py` to handle specific document types (beyond 160 and 180). Add your processor to the `processor_map` in `document_processors.process_raw_csv_data`.
 -   **Supported Document Types:** Update the `SUPPORTED_DOC_TYPES` dictionary in `config.py`.
+
+## How to get an API key
+
+* Register here: https://api.edinet-fsa.go.jp/api/auth/index.aspx?mode=1
+* Create an account (You'll need a phone number that accepts SMS text)
+* Manually setup an allow pop-up setting by adding `https://api.edinet-fsa.go.jp` to your allow list.
+* Add your name and phone number info and press submit to show your new API key.
 
 ## Disclaimer
 

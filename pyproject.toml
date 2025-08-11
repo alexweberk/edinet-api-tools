@@ -1,0 +1,60 @@
+[project]
+name = "edinet-api-tools"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "annotated-types",
+  "anyio",
+  "certifi",
+  "chardet",
+  "charset-normalizer",
+  "click",
+  "click-default-group",
+  "colorama",
+  "condense-json",
+  "distro",
+  "flake8",
+  "h11",
+  "httpcore",
+  "httpx",
+  "idna",
+  "jiter",
+  "llm",
+  "mccabe",
+  "mypy-extensions",
+  "numpy",
+  "openai",
+  "packaging",
+  "pandas",
+  "pathspec",
+  "platformdirs",
+  "pluggy",
+  "puremagic",
+  "pycodestyle",
+  "pydantic",
+  "pydantic_core",
+  "pyflakes",
+  "python-dateutil",
+  "python-dotenv",
+  "python-ulid",
+  "pytz",
+  "PyYAML",
+  "six",
+  "sniffio",
+  "sqlite-fts4",
+  "sqlite-migrate",
+  "sqlite-utils",
+  "tabulate",
+  "tqdm",
+  "typing-inspection",
+  "typing_extensions",
+  "tzdata",
+]
+
+[dependency-groups]
+dev = [
+    "ipython>=9.4.0",
+    "pandas-stubs>=2.3.0.250703",
+]

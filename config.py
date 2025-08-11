@@ -3,10 +3,7 @@ import os
 import logging
 from dotenv import load_dotenv
 
-# Load environment variables
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
+load_dotenv(".env", override=True)
 
 EDINET_API_KEY = os.environ.get('EDINET_API_KEY')
 
@@ -31,13 +28,3 @@ if not EDINET_API_KEY:
 if not LLM_API_KEY:
     logging.warning("LLM_API_KEY (or OPENAI_API_KEY) not set in .env file. LLM analysis will not work.")
 
-# Define supported document types for filtering/processing
-# Add more as needed
-SUPPORTED_DOC_TYPES = {
-    "160": "Semi-Annual Report",
-    "140": "Quarterly Report",
-    "180": "Extraordinary Report",
-    "350": "Large Holding Report",
-    "030": "Securities Registration Statement",
-    "120": "Securities Report",
-}

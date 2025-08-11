@@ -1,35 +1,55 @@
 # llm_analysis_tools.py
-import llm
-import logging
 import json
-from typing import Dict, Any, Type, Optional, List
+import logging
+from typing import Any, Dict, List, Optional, Type
+
+import llm
 from pydantic import BaseModel, Field
-from document_processors import StructuredDocumentData
 
 # LLM config
-from config import LLM_API_KEY, LLM_MODEL, LLM_FALLBACK_MODEL
+from config import LLM_API_KEY, LLM_FALLBACK_MODEL, LLM_MODEL
+from src.document_processors import StructuredDocumentData
 
 logger = logging.getLogger(__name__)
+
 
 # Pydantic Schemas for Structured Output
 class OneLineSummary(BaseModel):
     """Concise one-line summary of the key event or data point in the disclosure."""
+
     company_name_en: str = Field(..., description="Company name in English.")
-    summary: str = Field(..., description="Ultra concise (<30 words) explanation of the key event or data point, focusing on what was decided or done.")
+    summary: str = Field(
+        ...,
+        description="Ultra concise (<30 words) explanation of the key event or data point, focusing on what was decided or done.",
+    )
+
 
 class ExecutiveSummary(BaseModel):
     """Insightful, concise executive summary and key highlights."""
+
     company_name_en: str = Field(..., description="Company name in English (all caps).")
-    company_description_short: Optional[str] = Field(None, description="Very concise (<15 words) summary of what the company does.")
-    summary: str = Field(..., description="Insightful and concise executive summary interpreting the data with a strategic lens.")
-    key_highlights: List[str] = Field(..., description="Key takeaways or important points from the disclosure as bullet points.")
-    potential_impact_rationale: Optional[str] = Field(None, description="Very concise (<25 words) summary of the potential impact, with rationale.")
+    company_description_short: Optional[str] = Field(
+        None, description="Very concise (<15 words) summary of what the company does."
+    )
+    summary: str = Field(
+        ...,
+        description="Insightful and concise executive summary interpreting the data with a strategic lens.",
+    )
+    key_highlights: List[str] = Field(
+        ...,
+        description="Key takeaways or important points from the disclosure as bullet points.",
+    )
+    potential_impact_rationale: Optional[str] = Field(
+        None,
+        description="Very concise (<25 words) summary of the potential impact, with rationale.",
+    )
 
 
 # Base Tool class
 class BasePromptTool:
     """Base class for all prompt-based tools that use schemas."""
-    schema_class: Type[BaseModel] # Must be defined by subclasses
+
+    schema_class: Type[BaseModel]  # Must be defined by subclasses
     tool_name: str = "BaseTool"
 
     def get_model(self) -> llm.Model:
@@ -50,13 +70,17 @@ class BasePromptTool:
             logger.debug(f"Using primary LLM model: {model.model_id}")
             return model
         except Exception as e:
-            logger.warning(f"Failed to get primary LLM model '{LLM_MODEL}': {e}. Attempting fallback.")
+            logger.warning(
+                f"Failed to get primary LLM model '{LLM_MODEL}': {e}. Attempting fallback."
+            )
             try:
                 fallback_model = llm.get_model(LLM_FALLBACK_MODEL)
                 logger.debug(f"Using fallback LLM model: {fallback_model.model_id}")
                 return fallback_model
             except Exception as fallback_e:
-                logger.error(f"Failed to get fallback LLM model '{LLM_FALLBACK_MODEL}': {fallback_e}. LLM analysis disabled.")
+                logger.error(
+                    f"Failed to get fallback LLM model '{LLM_FALLBACK_MODEL}': {fallback_e}. LLM analysis disabled."
+                )
                 raise ConnectionError(f"Failed to get any LLM model: {e}, {fallback_e}")
 
     def create_prompt(self, structured_data: StructuredDocumentData) -> str:
@@ -66,14 +90,16 @@ class BasePromptTool:
         """
         raise NotImplementedError("Subclasses must implement create_prompt")
 
-    def format_to_text(self, schema_object: BaseModel) -> str:
+    def format_to_text(self, schema_object: Any) -> str:
         """
         Format the schema object output into a human-readable string.
         Subclasses must implement this.
         """
         raise NotImplementedError("Subclasses must implement format_to_text")
 
-    def generate_structured_output(self, structured_data: StructuredDocumentData) -> Optional[BaseModel]:
+    def generate_structured_output(
+        self, structured_data: StructuredDocumentData
+    ) -> Optional[BaseModel]:
         """Generate structured output from document data using the schema."""
         try:
             model = self.get_model()
@@ -82,52 +108,76 @@ class BasePromptTool:
             response = model.prompt(
                 prompt_text,
                 schema=self.schema_class,
-                system="You are a helpful financial analyst. Follow the schema provided precisely. Respond ONLY with valid JSON that conforms to the provided schema."
+                system="You are a helpful financial analyst. Follow the schema provided precisely. Respond ONLY with valid JSON that conforms to the provided schema.",
             )
 
             try:
-                 # Preferred: Access the parsed object if llm provides it directly
-                 # Check if the attribute exists AND is not None
-                 if hasattr(response, 'schema_object') and response.schema_object is not None:
-                      logger.debug("Using response.schema_object for parsing.")
-                      parsed_object = response.schema_object
-                 elif hasattr(response, 'parsed_data') and response.parsed_data is not None: # Some plugins might use this
-                      logger.debug("Using response.parsed_data for parsing.")
-                      parsed_object = response.parsed_data
-                 else:
-                      logger.debug("LLM response object did not have built-in schema object. Attempting JSON parse.")
-                      response_text = response.text() # Get the raw text output
-                      # Ensure the response text is not empty or just whitespace
-                      if not response_text or not response_text.strip():
-                          raise ValueError("LLM returned empty or whitespace response.")
+                # Preferred: Access the parsed object if llm provides it directly
+                # Check if the attribute exists AND is not None
+                if (
+                    hasattr(response, "schema_object")
+                    and response.schema_object is not None
+                ):
+                    logger.debug("Using response.schema_object for parsing.")
+                    parsed_object = response.schema_object
+                elif (
+                    hasattr(response, "parsed_data")
+                    and response.parsed_data is not None
+                ):  # Some plugins might use this
+                    logger.debug("Using response.parsed_data for parsing.")
+                    parsed_object = response.parsed_data
+                else:
+                    logger.debug(
+                        "LLM response object did not have built-in schema object. Attempting JSON parse."
+                    )
+                    response_text = response.text()  # Get the raw text output
+                    # Ensure the response text is not empty or just whitespace
+                    if not response_text or not response_text.strip():
+                        raise ValueError("LLM returned empty or whitespace response.")
 
-                      parsed_dict = json.loads(response_text)
-                      parsed_object = self.schema_class(**parsed_dict) # Validate and instantiate Pydantic model
+                    parsed_dict = json.loads(response_text)
+                    parsed_object = self.schema_class(
+                        **parsed_dict
+                    )  # Validate and instantiate Pydantic model
 
-                 logger.info(f"Successfully generated structured output for {self.tool_name}.")
-                 return parsed_object
+                logger.info(
+                    f"Successfully generated structured output for {self.tool_name}."
+                )
+                return parsed_object
 
             except (json.JSONDecodeError, ValueError, TypeError) as parse_error:
                 # Catch specific parsing errors (JSON issues or Pydantic validation failures)
-                logger.error(f"Failed to parse LLM response into {self.schema_class.__name__} schema for tool {self.tool_name}: {parse_error}")
-                logger.debug(f"Raw LLM response text (attempted parse): {response.text()}")
+                logger.error(
+                    f"Failed to parse LLM response into {self.schema_class.__name__} schema for tool {self.tool_name}: {parse_error}"
+                )
+                logger.debug(
+                    f"Raw LLM response text (attempted parse): {response.text()}"
+                )
                 return None
             except Exception as parse_error:
-                 logger.error(f"An unexpected error occurred during schema parsing/validation for tool {self.tool_name}: {parse_error}")
-                 logger.debug(f"Raw LLM response text (attempted parse): {response.text()}")
-                 return None
-
+                logger.error(
+                    f"An unexpected error occurred during schema parsing/validation for tool {self.tool_name}: {parse_error}"
+                )
+                logger.debug(
+                    f"Raw LLM response text (attempted parse): {response.text()}"
+                )
+                return None
 
         except ConnectionError:
-             logger.error(f"Skipping {self.tool_name} generation due to LLM model unavailability.")
-             return None
+            logger.error(
+                f"Skipping {self.tool_name} generation due to LLM model unavailability."
+            )
+            return None
         except Exception as e:
-            logger.error(f"An unexpected error occurred during {self.tool_name} generation: {e}")
+            logger.error(
+                f"An unexpected error occurred during {self.tool_name} generation: {e}"
+            )
             # traceback.print_exc() # for detailed traceback
             return None
 
-
-    def generate_formatted_text(self, structured_data: StructuredDocumentData) -> Optional[str]:
+    def generate_formatted_text(
+        self, structured_data: StructuredDocumentData
+    ) -> Optional[str]:
         """Generate structured output and format it to plain text."""
         structured_output = self.generate_structured_output(structured_data)
         if structured_output:
@@ -141,15 +191,18 @@ class BasePromptTool:
 
 # Specific Tools
 
+
 class OneLinerTool(BasePromptTool):
     schema_class = OneLineSummary
     tool_name = "one_line_summary"
 
     def create_prompt(self, structured_data: StructuredDocumentData) -> str:
         """Prompt for a one-line summary."""
-        company_name_en = structured_data.get('company_name_en', structured_data.get('company_name_ja', 'Unknown Company'))
-        document_type = structured_data.get('document_type', 'document')
-        document_title = structured_data.get('document_title', '')
+        company_name_en = structured_data.get(
+            "company_name_en", structured_data.get("company_name_ja", "Unknown Company")
+        )
+        document_type = structured_data.get("document_type", "document")
+        document_title = structured_data.get("document_title", "")
 
         prompt = (
             f"summary of the following Japanese financial disclosure text. "
@@ -162,23 +215,27 @@ class OneLinerTool(BasePromptTool):
         )
 
         # Include key facts
-        if structured_data.get('key_facts'):
+        if structured_data.get("key_facts"):
             prompt += "Key Facts:\n"
-            for key, value in structured_data['key_facts'].items():
-                 if isinstance(value, dict) and 'current' in value: # Handle structured facts
-                      prompt += f"- {key}: Current: {value.get('current', 'N/A')}, Prior: {value.get('prior', 'N/A')}\n"
-                 else:
-                      prompt += f"- {key}: {value}\n"
+            for key, value in structured_data["key_facts"].items():
+                if (
+                    isinstance(value, dict) and "current" in value
+                ):  # Handle structured facts
+                    prompt += f"- {key}: Current: {value.get('current', 'N/A')}, Prior: {value.get('prior', 'N/A')}\n"
+                else:
+                    prompt += f"- {key}: {value}\n"
             prompt += "\n"
 
         # Include text blocks (first few or most relevant)
-        if structured_data.get('text_blocks'):
+        if structured_data.get("text_blocks"):
             prompt += "Relevant Text Blocks:\n"
-            for block in structured_data['text_blocks'][:3]: # Limit to first few relevant blocks
-                 # Ensure content_jp or content exists
-                 content = block.get('content_jp', block.get('content', ''))
-                 if content:
-                    prompt += f"--- {block.get('title_en', block.get('title', 'Section'))} ---\n{content[:500]}...\n\n" # Truncate content
+            for block in structured_data["text_blocks"][
+                :3
+            ]:  # Limit to first few relevant blocks
+                # Ensure content_jp or content exists
+                content = block.get("content_jp", block.get("content", ""))
+                if content:
+                    prompt += f"--- {block.get('title_en', block.get('title', 'Section'))} ---\n{content[:500]}...\n\n"  # Truncate content
 
         return prompt
 
@@ -193,9 +250,11 @@ class ExecutiveSummaryTool(BasePromptTool):
 
     def create_prompt(self, structured_data: StructuredDocumentData) -> str:
         """Prompt for an executive summary."""
-        company_name_en = structured_data.get('company_name_en', structured_data.get('company_name_ja', 'Unknown Company'))
-        document_type = structured_data.get('document_type', 'document')
-        document_title = structured_data.get('document_title', '')
+        company_name_en = structured_data.get(
+            "company_name_en", structured_data.get("company_name_ja", "Unknown Company")
+        )
+        document_type = structured_data.get("document_type", "document")
+        document_title = structured_data.get("document_title", "")
 
         prompt = (
             f"\n\nProvide an insightful, concise executive summary and key highlights "
@@ -203,48 +262,53 @@ class ExecutiveSummaryTool(BasePromptTool):
             f"Do not reply in Japanese. "
             f"Be more concise than normal and interpret the data with a strategic lens and rationale. "
             f"Provide a very concise (<15 words) summary of what the company does."
-            f"\n\nCompany Name: {company_name_en}" # Provide company name explicitly
+            f"\n\nCompany Name: {company_name_en}"  # Provide company name explicitly
             f"\nDocument Type: {document_type}"
             f"\nDocument Title: {document_title}\n\n"
             f"Disclosure Content (extracted key facts and text blocks):\n"
         )
 
         # Include key facts
-        if structured_data.get('key_facts'):
+        if structured_data.get("key_facts"):
             prompt += "Key Facts:\n"
-            for key, value in structured_data['key_facts'].items():
-                 if isinstance(value, dict) and 'current' in value: # Handle structured facts
-                      prompt += f"- {key}: Current: {value.get('current', 'N/A')}, Prior: {value.get('prior', 'N/A')}\n"
-                 else:
-                      prompt += f"- {key}: {value}\n"
+            for key, value in structured_data["key_facts"].items():
+                if (
+                    isinstance(value, dict) and "current" in value
+                ):  # Handle structured facts
+                    prompt += f"- {key}: Current: {value.get('current', 'N/A')}, Prior: {value.get('prior', 'N/A')}\n"
+                else:
+                    prompt += f"- {key}: {value}\n"
             prompt += "\n"
 
         # Include relevant text blocks (potentially more than one-liner)
-        if structured_data.get('text_blocks'):
+        if structured_data.get("text_blocks"):
             prompt += "Relevant Text Blocks:\n"
             # Include content up to a reasonable limit to fit in the prompt
             combined_text = ""
-            for block in structured_data['text_blocks']:
-                 title = block.get('title_en', block.get('title', 'Section'))
-                 content = block.get('content_jp', block.get('content', ''))
-                 if content:
+            for block in structured_data["text_blocks"]:
+                title = block.get("title_en", block.get("title", "Section"))
+                content = block.get("content_jp", block.get("content", ""))
+                if content:
                     block_text = f"--- {title} ---\n{content}\n\n"
                     # Estimate token usage - simple char count approximation
-                    if len(combined_text) + len(block_text) < 8000: # Arbitrary char limit approximation for prompt
-                         combined_text += block_text
+                    if (
+                        len(combined_text) + len(block_text) < 8000
+                    ):  # Arbitrary char limit approximation for prompt
+                        combined_text += block_text
                     else:
-                         break # Stop adding blocks if prompt gets too long
+                        break  # Stop adding blocks if prompt gets too long
             prompt += combined_text
 
         return prompt
 
-
     def format_to_text(self, schema_object: ExecutiveSummary) -> str:
         """Format the executive summary."""
-        text = f""
+        text = ""
         if schema_object.company_description_short:
             # Format company description separately
-            text += f"Company Description: {schema_object.company_description_short}\n\n"
+            text += (
+                f"Company Description: {schema_object.company_description_short}\n\n"
+            )
         text += f"Executive Summary: {schema_object.summary}\n\n"
         if schema_object.key_highlights:
             text += "Key Highlights:\n"
@@ -258,7 +322,6 @@ class ExecutiveSummaryTool(BasePromptTool):
         return text
 
 
-
 # Tool Map and Analysis Function
 TOOL_MAP: Dict[str, Type[BasePromptTool]] = {
     OneLinerTool.tool_name: OneLinerTool,
@@ -266,7 +329,10 @@ TOOL_MAP: Dict[str, Type[BasePromptTool]] = {
     # Add other tools here
 }
 
-def analyze_document_data(structured_data: StructuredDocumentData, tool_name: str) -> Optional[str]:
+
+def analyze_document_data(
+    structured_data: StructuredDocumentData, tool_name: str
+) -> Optional[str]:
     """
     Analyze structured document data using the specified LLM tool.
 
@@ -282,9 +348,11 @@ def analyze_document_data(structured_data: StructuredDocumentData, tool_name: st
         return f"Error: Unknown analysis tool '{tool_name}'"
 
     tool_class = TOOL_MAP[tool_name]
-    tool_instance = tool_class() # Create an instance of the tool
+    tool_instance = tool_class()  # Create an instance of the tool
 
-    logger.info(f"Attempting to generate '{tool_name}' analysis for doc_id: {structured_data.get('doc_id', 'N/A')}")
+    logger.info(
+        f"Attempting to generate '{tool_name}' analysis for doc_id: {structured_data.get('doc_id', 'N/A')}"
+    )
     formatted_output = tool_instance.generate_formatted_text(structured_data)
 
     if formatted_output:
