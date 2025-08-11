@@ -7,8 +7,24 @@ from typing import Any
 
 import httpx
 
-from config import EDINET_API_KEY
+from config import DELAY_SECONDS, EDINET_API_KEY, MAX_RETRIES
+from src.constants import (
+    API_CSV_DOCUMENT_TYPE,
+    API_TYPE_METADATA_AND_RESULTS,
+    EDINET_API_BASE_URL,
+    EDINET_DOCUMENT_API_BASE_URL,
+    HTTP_CLIENT_ERROR_START,
+    HTTP_SERVER_ERROR_END,
+    HTTP_SUCCESS,
+)
 from src.consts import SUPPORTED_DOC_TYPES
+from src.error_handlers import ErrorContext, handle_api_errors
+from src.exceptions import (
+    EdinetConnectionError,
+    EdinetDocumentFetchError,
+    EdinetRetryExceededError,
+    ValidationError,
+)
 
 # Use module-specific logger
 logger = logging.getLogger(__name__)
@@ -17,9 +33,9 @@ logger = logging.getLogger(__name__)
 # API interaction functions
 def fetch_documents_list(
     date: str | datetime.date,
-    type: int = 2,
-    max_retries: int = 3,
-    delay_seconds: int = 5,
+    type: int = int(API_TYPE_METADATA_AND_RESULTS),
+    max_retries: int = MAX_RETRIES,
+    delay_seconds: int = DELAY_SECONDS,
 ) -> dict[str, Any]:
     """
     Retrieve disclosure documents from EDINET API for a specified date with retries.
@@ -28,14 +44,14 @@ def fetch_documents_list(
         try:
             datetime.datetime.strptime(date, "%Y-%m-%d")
         except ValueError as e:
-            raise ValueError("Invalid date string. Use format 'YYYY-MM-DD'") from e
+            raise ValidationError("Invalid date string. Use format 'YYYY-MM-DD'") from e
         date_str = date
     elif isinstance(date, datetime.date):
         date_str = date.strftime("%Y-%m-%d")
     else:
-        raise TypeError("Date must be 'YYYY-MM-DD' or datetime.date")
+        raise ValidationError("Date must be 'YYYY-MM-DD' or datetime.date")
 
-    url = "https://disclosure.edinet-fsa.go.jp/api/v2/documents.json"
+    url = f"{EDINET_API_BASE_URL}/documents.json"
     params = {
         "date": date_str,
         "type": str(type),  # '1' is metadata only; '2' is metadata and results
@@ -49,7 +65,7 @@ def fetch_documents_list(
                 response = client.get(url, params=params)
 
                 # Check for non-200 status codes
-                if response.status_code != 200:
+                if response.status_code != HTTP_SUCCESS:
                     logger.error(
                         f"API returned status code {response.status_code} for date {date_str}."
                     )
@@ -60,7 +76,12 @@ def fetch_documents_list(
                     except Exception:
                         pass
                     # If it's a client error (4xx) or server error (5xx), might be retryable
-                    if 400 <= response.status_code < 600 and attempt < max_retries - 1:
+                    if (
+                        HTTP_CLIENT_ERROR_START
+                        <= response.status_code
+                        < HTTP_SERVER_ERROR_END
+                        and attempt < max_retries - 1
+                    ):
                         logger.warning(f"Retrying in {delay_seconds}s...")
                         time.sleep(delay_seconds)
                         continue  # Retry
@@ -79,7 +100,9 @@ def fetch_documents_list(
                 time.sleep(delay_seconds)
             else:
                 logger.error("Max retries reached for fetching documents.")
-                raise  # Re-raise the last exception
+                raise EdinetConnectionError(
+                    f"Failed to fetch documents for {date_str} after {max_retries} attempts"
+                ) from e
         except Exception as e:
             logger.error(
                 f"An unexpected error occurred fetching documents for {date_str}: {e}"
@@ -89,19 +112,23 @@ def fetch_documents_list(
                 time.sleep(delay_seconds)
             else:
                 logger.error("Max retries reached for fetching documents.")
-                raise  # Re-raise
+                raise EdinetConnectionError(
+                    f"Failed to fetch documents for {date_str} after {max_retries} attempts"
+                ) from e
 
     # This line should theoretically not be reached if max_retries > 0
-    raise Exception("Failed to fetch documents after multiple retries.")
+    raise EdinetRetryExceededError("Failed to fetch documents after multiple retries.")
 
 
-def fetch_document(doc_id: str, max_retries: int = 3, delay_seconds: int = 5) -> bytes:
+def fetch_document(
+    doc_id: str, max_retries: int = MAX_RETRIES, delay_seconds: int = DELAY_SECONDS
+) -> bytes:
     """
     Retrieve a specific document from EDINET API with retries and return raw bytes.
     """
-    url = f"https://api.edinet-fsa.go.jp/api/v2/documents/{doc_id}"
+    url = f"{EDINET_DOCUMENT_API_BASE_URL}/documents/{doc_id}"
     params = {
-        "type": "5",  # '5' for CSV
+        "type": API_CSV_DOCUMENT_TYPE,  # CSV document format
         "Subscription-Key": EDINET_API_KEY,
     }
 
@@ -112,7 +139,7 @@ def fetch_document(doc_id: str, max_retries: int = 3, delay_seconds: int = 5) ->
                 response = client.get(url, params=params)
 
                 # Check for non-200 status codes
-                if response.status_code != 200:
+                if response.status_code != HTTP_SUCCESS:
                     logger.error(
                         f"API returned status code {response.status_code} for document {doc_id}."
                     )
@@ -140,7 +167,9 @@ def fetch_document(doc_id: str, max_retries: int = 3, delay_seconds: int = 5) ->
                 time.sleep(delay_seconds)
             else:
                 logger.error("Max retries reached for fetching document.")
-                raise
+                raise EdinetDocumentFetchError(
+                    f"Failed to fetch document {doc_id} after {max_retries} attempts"
+                ) from e
         except Exception as e:
             logger.error(
                 f"An unexpected error occurred fetching document {doc_id}: {e}"
@@ -150,20 +179,22 @@ def fetch_document(doc_id: str, max_retries: int = 3, delay_seconds: int = 5) ->
                 time.sleep(delay_seconds)
             else:
                 logger.error("Max retries reached for fetching document.")
-                raise
+                raise EdinetDocumentFetchError(
+                    f"Failed to fetch document {doc_id} after {max_retries} attempts"
+                ) from e
 
-    raise Exception(f"Failed to fetch document {doc_id} after multiple retries.")
+    raise EdinetRetryExceededError(
+        f"Failed to fetch document {doc_id} after multiple retries."
+    )
 
 
+@handle_api_errors
 def save_document_content(doc_content: bytes, output_path: str) -> None:
     """Save the document content (bytes) to file."""
-    try:
+    with ErrorContext(f"Saving document to {output_path}", logger):
         with open(output_path, "wb") as file_out:
             file_out.write(doc_content)
         logger.info(f"Saved document content to {output_path}")
-    except OSError as e:
-        logger.error(f"Error saving document content to {output_path}: {e}")
-        raise  # Re-raise to indicate failure
 
 
 def download_documents(
@@ -274,7 +305,9 @@ def get_documents_for_date_range(
     excluded_doc_type_codes: list[str] | None = None,
     require_sec_code: bool = True,
 ) -> list[dict[str, Any]]:
-    """Retrieve and filter documents for a date range."""
+    """
+    Retrieve and filter documents for a date range.
+    """
     if edinet_codes is None:
         edinet_codes = []
     if doc_type_codes is None:

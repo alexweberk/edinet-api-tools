@@ -1,65 +1,19 @@
-import datetime
 import logging
-import os
-from typing import Any
 
+from config import ANALYSIS_LIMIT, DAYS_BACK
+from src.constants import DEFAULT_DOWNLOAD_DIR
 from src.consts import SUPPORTED_DOC_TYPES
-from src.edinet_tools import download_documents, get_documents_for_date_range
+from src.edinet_tools import download_documents
 from src.llm_analysis_tools import TOOL_MAP, analyze_document_data
 from src.logging_config import setup_logging
-from src.utils import print_header, print_progress, process_zip_directory
+from src.services import (
+    get_most_recent_documents,
+    get_structured_data_from_zip_directory,
+)
+from src.utils import print_header, print_progress
 
 setup_logging()
 logger = logging.getLogger(__name__)
-
-
-def get_most_recent_documents(
-    doc_type_codes: list[str], days_back: int = 7
-) -> tuple[list[dict[str, Any]], datetime.date | None]:
-    """
-    Fetch documents from the most recent day with filings within a date range.
-    Searches back day by day up to `days_back`.
-    """
-    current_date = datetime.date.today()
-    end_date = current_date  # Search up to today
-    start_date = current_date - datetime.timedelta(
-        days=days_back
-    )  # Search back up to days_back
-
-    logger.info(
-        f"Searching for documents in the last {days_back} days ({start_date} to {end_date})..."
-    )
-
-    # Iterate backwards day by day from end_date to start_date
-    date_to_check = end_date
-    while date_to_check >= start_date:
-        logger.info(f"Fetching documents for {date_to_check}...")
-        try:
-            # Get documents for a single date
-            docs = get_documents_for_date_range(
-                date_to_check, date_to_check, doc_type_codes=doc_type_codes
-            )
-
-            if docs:
-                logger.info(
-                    f"Found {len(docs)} documents for {date_to_check}. Processing these."
-                )
-                return (
-                    docs,
-                    date_to_check,
-                )  # Return documents for the first day with results found
-
-            logger.info(f"No documents found for {date_to_check}. Trying previous day.")
-            date_to_check -= datetime.timedelta(days=1)
-
-        except Exception as e:
-            logger.error(f"Error fetching documents for {date_to_check}: {e}")
-            # Continue to previous day even if one date fails
-
-    logger.warning(
-        f"No documents found in the last {days_back} days matching criteria."
-    )
-    return [], None
 
 
 def run_demo() -> None:
@@ -70,16 +24,21 @@ def run_demo() -> None:
 
     # Define document types to look for
     # Only fetch document types for which we have specific processors to ensure
-    # process_zip_directory can create meaningful structured data.
+    # get_structured_data_from_zip_directory can create meaningful structured data.
     # If you want to fetch other types, ensure GenericReportProcessor is sufficient,
     # or add specific processors in document_processors.py
-    doc_type_codes_to_fetch = ["160", "180"]  # Semi-Annual and Extraordinary Reports
+    doc_type_codes_to_fetch = [
+        # "140",  # Quarterly Reports
+        "160",  # Semi-Annual Reports
+        "180",  # Extraordinary Reports
+    ]
 
-    days_back = 3
+    days_back = DAYS_BACK
 
     # Fetch the most recent documents of the specified types
     docs_metadata, found_date = get_most_recent_documents(
-        doc_type_codes_to_fetch, days_back=days_back
+        doc_type_codes_to_fetch,
+        days_back=days_back,
     )
 
     if not docs_metadata:
@@ -88,7 +47,7 @@ def run_demo() -> None:
         )
         return
 
-    download_dir = os.path.join(".", "downloads")
+    download_dir = DEFAULT_DOWNLOAD_DIR
 
     # download_documents function handles creating the directory
     download_documents(docs_metadata, download_dir)
@@ -96,9 +55,9 @@ def run_demo() -> None:
     logger.info(f"\nProcessing downloaded documents from {found_date}...")
 
     # Process the downloaded zip files into structured data
-    # We pass the keys of SUPPORTED_DOC_TYPES because process_zip_directory
+    # We pass the keys of SUPPORTED_DOC_TYPES because get_structured_data_from_zip_directory
     # uses process_raw_csv_data which dispatches based on these codes.
-    structured_document_data_list = process_zip_directory(
+    structured_document_data_list = get_structured_data_from_zip_directory(
         download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
     )
 
@@ -134,8 +93,8 @@ def run_demo() -> None:
     all_analysis_results = []
 
     # Analyze the first few *successfully processed* documents using LLM tools
-    # Limit analysis to the first 5 processed documents found
-    num_to_analyze = min(5, len(docs_metadata_for_processed))
+    # Limit analysis to the configured number of processed documents
+    num_to_analyze = min(ANALYSIS_LIMIT, len(docs_metadata_for_processed))
     docs_to_analyze_metadata = docs_metadata_for_processed[:num_to_analyze]
 
     logger.info(

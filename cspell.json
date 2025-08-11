@@ -1,6 +1,8 @@
 {
   "version": "0.2",
-  "ignorePaths": ["pyproject.toml"],
+  "ignorePaths": [
+    "pyproject.toml"
+  ],
   "dictionaryDefinitions": [],
   "dictionaries": [],
   "words": [
@@ -12,6 +14,7 @@
     "jpdei",
     "jpigp",
     "jppfs",
+    "ONELINER",
     "retryable",
     "xbrl"
   ],

@@ -1,17 +1,12 @@
-# logging_config.py
 import logging
+
+from src.constants import LOG_FORMAT
 
 
 def setup_logging() -> None:
     """Configures basic logging for the application."""
     logging.basicConfig(
-        level=logging.INFO,  # Default logging level
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler()  # Log to console
-            # Add a file handler if you want logs saved to a file
-            # logging.FileHandler('edinet_tools.log')
-        ],
+        level=logging.INFO,
+        format=LOG_FORMAT,
+        handlers=[logging.StreamHandler()],
     )
-    # Optional: Set level for specific loggers if needed
-    # logging.getLogger('httpx').setLevel(logging.WARNING)  # Suppress noisy logs
