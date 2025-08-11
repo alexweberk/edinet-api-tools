@@ -156,7 +156,9 @@ def load_and_validate_config() -> AppConfig:
         config = AppConfig(
             edinet=EdinetConfig(api_key=edinet_api_key),
             llm=LLMConfig(
-                api_key=llm_api_key, model=llm_model, fallback_model=llm_fallback_model
+                api_key=llm_api_key,
+                model=llm_model,
+                fallback_model=llm_fallback_model,
             ),
             azure=AzureConfig(
                 api_key=azure_api_key,

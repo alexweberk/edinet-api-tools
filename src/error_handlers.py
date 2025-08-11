@@ -1,4 +1,3 @@
-# error_handlers.py
 """
 Standardized error handling patterns and utilities.
 """

@@ -1,4 +1,3 @@
-# edinet_tools.py
 import datetime
 import logging
 import os
@@ -42,14 +41,19 @@ def fetch_documents_list(
     """
     if isinstance(date, str):
         try:
-            datetime.datetime.strptime(date, "%Y-%m-%d")
+            datetime.datetime.strptime(date, "%Y-%m-%d")  # Validate format
+            date_str = date  # Use the original string if valid
         except ValueError as e:
-            raise ValidationError("Invalid date string. Use format 'YYYY-MM-DD'") from e
-        date_str = date
+            raise ValidationError(
+                f"Invalid date string. Use format 'YYYY-MM-DD'. Got: {date}"
+            ) from e
     elif isinstance(date, datetime.date):
         date_str = date.strftime("%Y-%m-%d")
     else:
-        raise ValidationError("Date must be 'YYYY-MM-DD' or datetime.date")
+        # This should never happen, but just in case
+        raise ValidationError(
+            f"Date must be 'YYYY-MM-DD' or datetime.date. Got: {date}"
+        )
 
     url = f"{EDINET_API_BASE_URL}/documents.json"
     params = {
@@ -127,6 +131,14 @@ def fetch_document(
 ) -> bytes:
     """
     Retrieve a specific document from EDINET API with retries and return raw bytes.
+
+    Args:
+        doc_id: The ID of the document to fetch.
+        max_retries: Maximum number of retries.
+        delay_seconds: Delay between retries.
+
+    Returns:
+        The raw bytes of the document.
     """
     url = f"{EDINET_DOCUMENT_API_BASE_URL}/documents/{doc_id}"
     params = {
@@ -309,6 +321,17 @@ def get_documents_for_date_range(
 ) -> list[dict[str, Any]]:
     """
     Retrieve and filter documents for a date range.
+
+    Args:
+        start_date: Start date for the date range.
+        end_date: End date for the date range.
+        edinet_codes: List of EDINET codes to filter by.
+        doc_type_codes: List of document type codes to filter by.
+        excluded_doc_type_codes: List of document type codes to exclude.
+        require_sec_code: Whether to require a security code.
+
+    Returns:
+        List of documents that match the criteria.
     """
     if edinet_codes is None:
         edinet_codes = []
