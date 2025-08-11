@@ -13,7 +13,7 @@ from src.constants import (
 )
 from src.edinet.edinet_tools import get_documents_for_date_range
 from src.error_handlers import ErrorContext, log_exceptions
-from src.llm_analysis.tools import TOOL_MAP
+from src.llm_tools import TOOL_MAP
 from src.logging_config import setup_logging
 from src.processors.base_processor import StructuredDocumentData
 from src.processors.extraordinary_processor import ExtraordinaryReportProcessor

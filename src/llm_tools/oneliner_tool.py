@@ -5,8 +5,8 @@ from src.constants import (
     MAX_CONTENT_PREVIEW_CHARS,
     MAX_TEXT_BLOCKS_FOR_ONELINER,
 )
-from src.llm_analysis.base_tool import BasePromptTool
-from src.llm_analysis.schemas import OneLineSummary
+from src.llm_tools.base_tool import BasePromptTool
+from src.llm_tools.schemas import OneLineSummary
 from src.processors.base_processor import StructuredDocumentData
 
 logger = logging.getLogger(__name__)

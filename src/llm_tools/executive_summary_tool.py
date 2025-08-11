@@ -5,8 +5,8 @@ from src.constants import (
     MAX_COMPANY_DESCRIPTION_WORDS,
     MAX_PROMPT_CHAR_LIMIT,
 )
-from src.llm_analysis.base_tool import BasePromptTool
-from src.llm_analysis.schemas import ExecutiveSummary
+from src.llm_tools.base_tool import BasePromptTool
+from src.llm_tools.schemas import ExecutiveSummary
 from src.processors.base_processor import StructuredDocumentData
 
 logger = logging.getLogger(__name__)
