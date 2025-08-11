@@ -6,14 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Python project using standard package management with pip and requirements.txt. No build system like Poetry or specialized task runners are configured.
 
-**Running the demo:**
+**Running main.py:**
 ```bash
-python demo.py
+uv run python main.py
 ```
 
 **Installing dependencies:**
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 **Linting and code formatting:**

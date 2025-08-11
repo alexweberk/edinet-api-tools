@@ -121,7 +121,9 @@ def fetch_documents_list(
 
 
 def fetch_document(
-    doc_id: str, max_retries: int = MAX_RETRIES, delay_seconds: int = DELAY_SECONDS
+    doc_id: str,
+    max_retries: int = MAX_RETRIES,
+    delay_seconds: int = DELAY_SECONDS,
 ) -> bytes:
     """
     Retrieve a specific document from EDINET API with retries and return raw bytes.
