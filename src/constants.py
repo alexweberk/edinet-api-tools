@@ -82,3 +82,13 @@ DEFAULT_DOWNLOAD_DIR = "./downloads"
 
 # Logging format
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Supported Document Types
+SUPPORTED_DOC_TYPES: dict[str, str] = {
+    "160": "Semi-Annual Report",
+    "140": "Quarterly Report",
+    "180": "Extraordinary Report",
+    "350": "Large Holding Report",
+    "030": "Securities Registration Statement",
+    "120": "Securities Report",
+}

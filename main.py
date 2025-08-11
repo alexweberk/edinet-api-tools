@@ -1,9 +1,8 @@
 import logging
 
 from src.config import ANALYSIS_LIMIT, DAYS_BACK
-from src.constants import DEFAULT_DOWNLOAD_DIR
-from src.consts import SUPPORTED_DOC_TYPES
-from src.edinet_tools import download_documents
+from src.constants import DEFAULT_DOWNLOAD_DIR, SUPPORTED_DOC_TYPES
+from src.edinet.edinet_tools import download_documents
 from src.llm_analysis_tools import TOOL_MAP, analyze_document_data
 from src.logging_config import setup_logging
 from src.services import (

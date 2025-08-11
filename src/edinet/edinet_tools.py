@@ -14,8 +14,8 @@ from src.constants import (
     HTTP_CLIENT_ERROR_START,
     HTTP_SERVER_ERROR_END,
     HTTP_SUCCESS,
+    SUPPORTED_DOC_TYPES,
 )
-from src.consts import SUPPORTED_DOC_TYPES
 from src.error_handlers import ErrorContext, handle_api_errors
 from src.exceptions import (
     EdinetConnectionError,
