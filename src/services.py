@@ -28,19 +28,29 @@ logger = logging.getLogger(__name__)
 def get_most_recent_documents(
     doc_type_codes: list[str],
     days_back: int = DAYS_BACK,
-    limit: int | None = None,
+    edinet_codes: list[str] | None = None,
+    excluded_doc_type_codes: list[str] | None = None,
+    require_sec_code: bool = True,
 ) -> tuple[list[dict[str, Any]], datetime.date | None]:
     """
     Fetch documents from the most recent day with filings within a date range.
     Searches back day by day up to `days_back`.
-    If `limit` is provided, returns at most `limit` documents.
+
+    Args:
+        doc_type_codes: List of document type codes to filter by.
+        days_back: Number of days to search back.
+        edinet_codes: List of EDINET codes to filter by.
+        excluded_doc_type_codes: List of document type codes to exclude.
+        require_sec_code: Whether to require a security code.
+
+    Returns:
+        Tuple containing a list of documents and the date of the most recent documents found.
     """
     current_date = datetime.date.today()
     end_date = current_date  # Search up to today
     start_date = current_date - datetime.timedelta(
         days=days_back
     )  # Search back up to days_back
-    doc_fetch_count = 0
 
     logger.info(
         f"Searching for documents in the last {days_back} days ({start_date} to {end_date})..."
@@ -48,23 +58,28 @@ def get_most_recent_documents(
 
     # Iterate backwards day by day from end_date to start_date
     date_to_check = end_date
-    while date_to_check >= start_date and (limit is None or doc_fetch_count < limit):
+    while date_to_check >= start_date:
         logger.info(f"Fetching documents for {date_to_check}...")
         try:
             # Get documents for a single date
             docs = get_documents_for_date_range(
-                date_to_check, date_to_check, doc_type_codes=doc_type_codes
+                date_to_check,
+                date_to_check,
+                doc_type_codes=doc_type_codes,
+                edinet_codes=edinet_codes,
+                excluded_doc_type_codes=excluded_doc_type_codes,
+                require_sec_code=require_sec_code,
             )
 
             if docs:
                 logger.info(
                     f"Found {len(docs)} documents for {date_to_check}. Processing these."
                 )
-                doc_fetch_count += len(docs)
+
                 return (
                     docs,
-                    date_to_check,
-                )  # Return documents for the first day with results found
+                    date_to_check,  # Return documents for the first day with results
+                )
 
             logger.info(f"No documents found for {date_to_check}. Trying previous day.")
             date_to_check -= datetime.timedelta(days=1)
