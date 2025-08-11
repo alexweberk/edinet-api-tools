@@ -1,4 +1,3 @@
-# config_validation.py
 """
 Configuration validation using Pydantic models.
 """
@@ -6,7 +5,7 @@ Configuration validation using Pydantic models.
 import os
 from typing import Any
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.exceptions import ConfigurationError
 
@@ -18,7 +17,7 @@ class LLMConfig(BaseModel):
     model: str = Field(default="gpt-4o", description="Primary LLM model")
     fallback_model: str = Field(default="gpt-4-turbo", description="Fallback LLM model")
 
-    @validator("api_key")
+    @field_validator("api_key")
     @classmethod
     def validate_api_key(cls, v: Any) -> str | None:
         """Validate API key is present."""
@@ -28,7 +27,7 @@ class LLMConfig(BaseModel):
             raise ValueError("API key appears to be too short")
         return v.strip()
 
-    @validator("model", "fallback_model")
+    @field_validator("model", "fallback_model")
     @classmethod
     def validate_model_names(cls, v: Any) -> str:
         """Validate model names are not empty."""
@@ -45,7 +44,7 @@ class AzureConfig(BaseModel):
     api_version: str | None = None
     deployment: str | None = None
 
-    @validator("endpoint")
+    @field_validator("endpoint")
     @classmethod
     def validate_endpoint(cls, v: Any) -> str | None:
         """Validate Azure endpoint format."""
@@ -53,7 +52,7 @@ class AzureConfig(BaseModel):
             raise ValueError("Azure endpoint must start with http:// or https://")
         return v
 
-    @validator("api_version")
+    @field_validator("api_version")
     @classmethod
     def validate_api_version(cls, v: Any) -> str | None:
         """Validate API version format."""
@@ -71,7 +70,7 @@ class EdinetConfig(BaseModel):
 
     api_key: str = Field(..., description="EDINET API key (required)")
 
-    @validator("api_key")
+    @field_validator("api_key")
     @classmethod
     def validate_api_key(cls, v: Any) -> str:
         """Validate EDINET API key."""
@@ -96,7 +95,7 @@ class ProcessingConfig(BaseModel):
     )
     days_back: int = Field(default=7, ge=1, le=365, description="Days to search back")
 
-    @validator("max_retries", "delay_seconds", "analysis_limit", "days_back")
+    @field_validator("max_retries", "delay_seconds", "analysis_limit", "days_back")
     @classmethod
     def validate_positive(cls, v: Any) -> int:
         """Ensure values are positive."""
@@ -133,6 +132,8 @@ def load_and_validate_config() -> AppConfig:
     try:
         # Extract environment variables
         edinet_api_key = os.environ.get("EDINET_API_KEY")
+        if not edinet_api_key:
+            raise ValueError("EDINET_API_KEY is required")
 
         # LLM configuration with fallbacks
         llm_api_key = os.environ.get("LLM_API_KEY") or os.environ.get("OPENAI_API_KEY")
