@@ -9,9 +9,10 @@ from src.constants import (
     AUDITOR_REPORT_PREFIX,
     CSV_EXTENSION,
     MACOS_METADATA_DIR,
+    SUPPORTED_DOC_TYPES,
     ZIP_EXTENSION,
 )
-from src.edinet.edinet_tools import get_documents_for_date_range
+from src.edinet.edinet_tools import download_documents, get_documents_for_date_range
 from src.error_handlers import ErrorContext, log_exceptions
 from src.llm_tools import TOOL_MAP
 from src.logging_config import setup_logging
@@ -322,3 +323,108 @@ def analyze_document_data(
     else:
         logger.error(f"Failed to generate '{tool_name}' analysis.")
         return f"Analysis Failed for '{tool_name}'"
+
+
+def get_structured_data_for_company_date_range(
+    edinet_code: str,
+    start_date: datetime.date | str,
+    end_date: datetime.date | str,
+    doc_type_codes: list[str] | None = None,
+    excluded_doc_type_codes: list[str] | None = None,
+    require_sec_code: bool = True,
+    download_dir: str | None = None,
+) -> list[dict[str, Any]]:
+    """Return structured data for filings by one company within a date range.
+
+    Validates dates (YYYY-MM-DD if str), ensures start_date <= end_date,
+    fetches documents via edinet_tools.get_documents_for_date_range filtered by
+    the given edinet_code, downloads ZIPs to a target directory (create a subdir
+    if download_dir is None), and converts ZIPs to structured dicts using
+    get_structured_data_from_zip_directory.
+
+    Args:
+        edinet_code: EDINET code for the company to fetch documents for
+        start_date: Start date for the date range (datetime.date or YYYY-MM-DD string)
+        end_date: End date for the date range (datetime.date or YYYY-MM-DD string)
+        doc_type_codes: Optional list of document type codes to include
+        excluded_doc_type_codes: Optional list of document type codes to exclude
+        require_sec_code: Whether to require a security code (default: True)
+        download_dir: Directory to download files to (auto-generated if None)
+
+    Returns:
+        List of structured dictionaries (one per processed document).
+    """
+    # Parse and validate dates
+    if isinstance(start_date, str):
+        try:
+            start_date_parsed = datetime.datetime.strptime(
+                start_date, "%Y-%m-%d"
+            ).date()
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid start_date format. Use 'YYYY-MM-DD'. Got: {start_date}"
+            ) from e
+    else:
+        start_date_parsed = start_date
+
+    if isinstance(end_date, str):
+        try:
+            end_date_parsed = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid end_date format. Use 'YYYY-MM-DD'. Got: {end_date}"
+            ) from e
+    else:
+        end_date_parsed = end_date
+
+    # Validate date range
+    if start_date_parsed > end_date_parsed:
+        raise ValueError(
+            f"start_date ({start_date_parsed}) must be <= end_date ({end_date_parsed})"
+        )
+
+    logger.info(
+        f"Fetching documents for EDINET code {edinet_code} from {start_date_parsed} to {end_date_parsed}"
+    )
+
+    # Create download directory if not provided
+    if download_dir is None:
+        download_dir = (
+            f"downloads/company-{edinet_code}-{start_date_parsed}_{end_date_parsed}"
+        )
+
+    os.makedirs(download_dir, exist_ok=True)
+    logger.info(f"Using download directory: {download_dir}")
+
+    # Fetch documents for the company within the date range
+    docs_metadata = get_documents_for_date_range(
+        start_date=start_date_parsed,
+        end_date=end_date_parsed,
+        edinet_codes=[edinet_code],  # Filter by single EDINET code
+        doc_type_codes=doc_type_codes,
+        excluded_doc_type_codes=excluded_doc_type_codes,
+        require_sec_code=require_sec_code,
+    )
+
+    if not docs_metadata:
+        logger.info(
+            f"No documents found for EDINET code {edinet_code} in the specified date range"
+        )
+        return []
+
+    logger.info(f"Found {len(docs_metadata)} documents for {edinet_code}")
+
+    # Download the documents
+    download_documents(docs_metadata, download_dir)
+
+    # Process the downloaded zip files into structured data
+    # Use all supported document types for processing
+    structured_document_data_list = get_structured_data_from_zip_directory(
+        download_dir, doc_type_codes=list(SUPPORTED_DOC_TYPES.keys())
+    )
+
+    logger.info(
+        f"Successfully processed {len(structured_document_data_list)} documents for {edinet_code}"
+    )
+
+    return structured_document_data_list
