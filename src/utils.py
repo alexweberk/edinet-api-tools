@@ -1,7 +1,6 @@
 # utils.py
 import logging
 import os
-import re
 import tempfile
 import zipfile
 from typing import Any
@@ -95,22 +94,6 @@ def read_csv_file(file_path):
         f"Failed to read {file_path}. Unable to determine correct encoding or format."
     )
     return None
-
-
-# Text processing
-def clean_text(text) -> str | None:
-    """Clean and normalize text from disclosures."""
-    if text is None:
-        return None
-    # Ensure it's a string
-    text = str(text)
-    # replace full-width space with regular space
-    text = text.replace("\u3000", " ")
-    # remove excessive whitespace
-    text = re.sub(r"\s+", " ", text).strip()
-    # replace specific Japanese punctuation with Western equivalents for consistency
-    # return text.replace('。', '. ').replace('、', ', ')
-    return text
 
 
 # ZIP file processing

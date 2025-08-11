@@ -1,10 +1,23 @@
 # document_processors.py
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
-from src.utils import clean_text
-
 logger = logging.getLogger(__name__)
+
+
+def clean_text(text: str | None) -> str | None:
+    """Clean and normalize text from disclosures."""
+    if text is None:
+        return None
+    # replace full-width space with regular space
+    text = text.replace("\u3000", " ")
+    # remove excessive whitespace
+    text = re.sub(r"\s+", " ", text).strip()
+    # replace specific Japanese punctuation with Western equivalents for consistency
+    # return text.replace('。', '. ').replace('、', ', ')
+    return text
+
 
 # Define the structure of the output dictionary for document processors
 # This structured_data is what will be passed to the LLM tools
@@ -288,8 +301,10 @@ class GenericReportProcessor(BaseDocumentProcessor):
 
 # Dispatcher Function
 def process_raw_csv_data(
-    raw_csv_data: List[Dict[str, Any]], doc_id: str, doc_type_code: str
-) -> Optional[StructuredDocumentData]:
+    raw_csv_data: list[dict[str, Any]],
+    doc_id: str,
+    doc_type_code: str,
+) -> StructuredDocumentData | None:
     """
     Dispatches raw CSV data to the appropriate document processor.
 
