@@ -13,6 +13,7 @@ from src.constants import (
 )
 from src.edinet.edinet_tools import get_documents_for_date_range
 from src.error_handlers import ErrorContext, log_exceptions
+from src.llm_analysis.tools import TOOL_MAP
 from src.logging_config import setup_logging
 from src.processors.base_processor import StructuredDocumentData
 from src.processors.extraordinary_processor import ExtraordinaryReportProcessor
@@ -228,21 +229,31 @@ def get_structured_data_from_zip_file(
 
 
 def get_structured_data_from_zip_directory(
-    directory_path: str, doc_type_codes: list[str] | None = None
+    directory_path: str,
+    doc_type_codes: list[str] | None = None,
+    doc_ids: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Process all ZIP files in a directory containing EDINET documents.
 
-    :param directory_path: Path to the directory containing ZIP files.
-    :param doc_type_codes: Optional list of doc type codes to process.
-    :return: List of structured data dictionaries for each successfully processed document.
+    Args:
+        directory_path: Path to the directory containing ZIP files.
+        doc_type_codes: Optional list of doc type codes to process.
+        doc_ids: Optional list of doc IDs to process.
+
+    Returns:
+        List of structured data dictionaries for each successfully processed document.
     """
     all_structured_data = []
     if not os.path.isdir(directory_path):
         logger.error(f"Directory not found: {directory_path}")
         return []
 
-    zip_files = [f for f in os.listdir(directory_path) if f.endswith(ZIP_EXTENSION)]
+    zip_files = [
+        f
+        for f in os.listdir(directory_path)
+        if f.endswith(ZIP_EXTENSION) and (doc_ids is None or f.split("-")[0] in doc_ids)
+    ]
     total_files = len(zip_files)
     logger.info(f"Found {total_files} zip files in {directory_path} to process.")
 
@@ -278,3 +289,36 @@ def get_structured_data_from_zip_directory(
         f"Finished processing zip directory. Successfully extracted structured data for {len(all_structured_data)} documents."
     )
     return all_structured_data
+
+
+def analyze_document_data(
+    structured_data: StructuredDocumentData, tool_name: str
+) -> str | None:
+    """
+    Analyze structured document data using the specified LLM tool.
+
+    Args:
+        structured_data: Structured dictionary of the document's data.
+        tool_name: Name of the tool to use (key in TOOL_MAP).
+
+    Returns:
+        Formatted string output from the tool, or None if analysis failed.
+    """
+    if tool_name not in TOOL_MAP:
+        logger.error(f"Unknown LLM analysis tool: {tool_name}")
+        return f"Error: Unknown analysis tool '{tool_name}'"
+
+    tool_class = TOOL_MAP[tool_name]
+    tool_instance = tool_class()  # Create an instance of the tool
+
+    logger.info(
+        f"Attempting to generate '{tool_name}' analysis for doc_id: {structured_data.get('doc_id', 'N/A')}"
+    )
+    formatted_output = tool_instance.generate_formatted_text(structured_data)
+
+    if formatted_output:
+        logger.info(f"Successfully generated '{tool_name}' analysis.")
+        return formatted_output
+    else:
+        logger.error(f"Failed to generate '{tool_name}' analysis.")
+        return f"Analysis Failed for '{tool_name}'"
