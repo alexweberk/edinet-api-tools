@@ -11,3 +11,8 @@ venv
 *downloads
 *.csv
 *.zip
+
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb

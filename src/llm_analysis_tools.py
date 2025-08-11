@@ -6,8 +6,6 @@ from typing import Any
 import llm
 from pydantic import BaseModel, Field
 
-# LLM config
-from config import LLM_API_KEY, LLM_FALLBACK_MODEL, LLM_MODEL
 from src.constants import (
     DEFAULT_LLM_FALLBACK_MODEL,
     DEFAULT_LLM_MODEL,
@@ -21,6 +19,9 @@ from src.constants import (
 from src.error_handlers import ErrorContext, log_exceptions
 from src.exceptions import LLMModelUnavailableError, LLMResponseParsingError
 from src.processors.base_processor import StructuredDocumentData
+
+# LLM config
+from .config import LLM_API_KEY, LLM_FALLBACK_MODEL, LLM_MODEL
 
 logger = logging.getLogger(__name__)
 

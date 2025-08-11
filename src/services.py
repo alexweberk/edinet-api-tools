@@ -5,14 +5,13 @@ import tempfile
 import zipfile
 from typing import Any
 
-from config import DAYS_BACK
 from src.constants import (
     AUDITOR_REPORT_PREFIX,
     CSV_EXTENSION,
     MACOS_METADATA_DIR,
     ZIP_EXTENSION,
 )
-from src.edinet_tools import get_documents_for_date_range
+from src.edinet.edinet_tools import get_documents_for_date_range
 from src.error_handlers import ErrorContext, log_exceptions
 from src.logging_config import setup_logging
 from src.processors.base_processor import StructuredDocumentData
@@ -20,6 +19,8 @@ from src.processors.extraordinary_processor import ExtraordinaryReportProcessor
 from src.processors.generic_processor import GenericReportProcessor
 from src.processors.semiannual_processor import SemiAnnualReportProcessor
 from src.utils import read_csv_file
+
+from .config import DAYS_BACK
 
 setup_logging()
 logger = logging.getLogger(__name__)

@@ -6,7 +6,6 @@ from typing import Any
 
 import httpx
 
-from config import DELAY_SECONDS, EDINET_API_KEY, MAX_RETRIES
 from src.constants import (
     API_CSV_DOCUMENT_TYPE,
     API_TYPE_METADATA_AND_RESULTS,
@@ -25,6 +24,8 @@ from src.exceptions import (
     ValidationError,
 )
 
+from ..config import DELAY_SECONDS, EDINET_API_KEY, MAX_RETRIES
+
 # Use module-specific logger
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 # API interaction functions
 def fetch_documents_list(
     date: str | datetime.date,
-    type: int = int(API_TYPE_METADATA_AND_RESULTS),
+    api_type: int = int(API_TYPE_METADATA_AND_RESULTS),
     max_retries: int = MAX_RETRIES,
     delay_seconds: int = DELAY_SECONDS,
 ) -> dict[str, Any]:
@@ -58,8 +59,9 @@ def fetch_documents_list(
     url = f"{EDINET_API_BASE_URL}/documents.json"
     params = {
         "date": date_str,
-        "type": str(type),  # '1' is metadata only; '2' is metadata and results
+        "type": str(api_type),  # '1' is metadata only; '2' is metadata and results
         "Subscription-Key": EDINET_API_KEY,
+        # TODO: Add other parameters as needed
     }
 
     for attempt in range(max_retries):
