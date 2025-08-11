@@ -1,6 +1,7 @@
 # llm_analysis_tools.py
 import json
 import logging
+from typing import Any
 
 import llm
 from pydantic import BaseModel, Field
@@ -45,10 +46,10 @@ class ExecutiveSummary(BaseModel):
 
 
 # Base Tool class
-class BasePromptTool:
+class BasePromptTool[T_Schema: BaseModel]:
     """Base class for all prompt-based tools that use schemas."""
 
-    schema_class: type[BaseModel]  # Must be defined by subclasses
+    schema_class: type[T_Schema]  # Must be defined by subclasses
     tool_name: str = "BaseTool"
 
     def __init__(self) -> None:
@@ -94,7 +95,7 @@ class BasePromptTool:
         """
         raise NotImplementedError("Subclasses must implement create_prompt")
 
-    def format_to_text(self, schema_object: BaseModel) -> str:
+    def format_to_text(self, schema_object: T_Schema) -> str:
         """
         Format the schema object output into a human-readable string.
         Subclasses must implement this.
@@ -103,7 +104,7 @@ class BasePromptTool:
 
     def generate_structured_output(
         self, structured_data: StructuredDocumentData
-    ) -> BaseModel | None:
+    ) -> T_Schema | None:
         """Generate structured output from document data using the schema."""
         try:
             model = self.get_model()
@@ -196,8 +197,8 @@ class BasePromptTool:
 # Specific Tools
 
 
-class OneLinerTool(BasePromptTool):
-    schema_class: type[BaseModel] = OneLineSummary
+class OneLinerTool(BasePromptTool[OneLineSummary]):
+    schema_class: type[OneLineSummary] = OneLineSummary
     tool_name: str = "one_line_summary"
 
     def create_prompt(self, structured_data: StructuredDocumentData) -> str:
@@ -248,8 +249,8 @@ class OneLinerTool(BasePromptTool):
         return f"{schema_object.summary}"
 
 
-class ExecutiveSummaryTool(BasePromptTool):
-    schema_class: type[BaseModel] = ExecutiveSummary
+class ExecutiveSummaryTool(BasePromptTool[ExecutiveSummary]):
+    schema_class: type[ExecutiveSummary] = ExecutiveSummary
     tool_name: str = "executive_summary"
 
     def create_prompt(self, structured_data: StructuredDocumentData) -> str:
@@ -327,7 +328,7 @@ class ExecutiveSummaryTool(BasePromptTool):
 
 
 # Tool Map and Analysis Function
-TOOL_MAP: dict[str, type[BasePromptTool]] = {
+TOOL_MAP: dict[str, type[BasePromptTool[Any]]] = {
     OneLinerTool.tool_name: OneLinerTool,
     ExecutiveSummaryTool.tool_name: ExecutiveSummaryTool,
     # Add other tools here
